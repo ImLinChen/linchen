@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>sus - Television</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            background: #121212; color: white; 
+            font-family: "Microsoft JhengHei", sans-serif; 
+            margin: 0; display: flex; justify-content: center; align-items: center; 
+            height: 100vh; overflow: hidden;
+        }
+
+        /* 主佈局：螢幕與遙控器 3:1 */
+        .main-layout {
+            display: flex;
+            width: 95vw;
+            height: 85vh;
+            gap: 20px;
+        }
+
+        /* 左側電視區 (佔 3 份) */
+        .tv-section {
+            flex: 3;
+            position: relative;
+            background: #000;
+            border: 15px solid #282828;
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.7);
+            overflow: hidden;
+        }
+        #player { width: 100%; height: 100%; }
+
+        /* 雪花效果 */
+        .static-noise {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://media.giphy.com/media/oEI9uWUicGLeE/giphy.gif');
+            background-size: cover; z-index: 5; display: none; opacity: 0.7; pointer-events: none;
+        }
+
+        /* OSD 顯示 */
+        #osd {
+            position: absolute; top: 30px; left: 30px;
+            color: #0f0; font-size: 36px; font-family: monospace;
+            text-shadow: 2px 2px #000; z-index: 10; display: none;
+        }
+
+        /* 右側遙控器區 (佔 1 份) */
+        .remote-section {
+            flex: 1;
+            background: #333;
+            border-radius: 25px;
+            padding: 25px;
+            display: flex; flex-direction: column; align-items: center;
+            box-shadow: inset 0 0 15px #000;
+        }
+
+        #digit-input {
+            width: 100%; height: 45px; background: #111; color: #0f0;
+            font-family: monospace; font-size: 28px; text-align: center;
+            line-height: 45px; border-radius: 8px; margin-bottom: 20px;
+            border: 2px solid #444;
+        }
+
+        /* 遙控器按鈕格線 */
+        .button-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; width: 100%;
+        }
+
+        button {
+            padding: 15px 5px; font-size: 16px; font-weight: bold;
+            background: #444; color: #fff; border: none; border-radius: 10px;
+            cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background: #555; }
+        button:active { background: #222; transform: scale(0.95); }
+
+        .btn-large { grid-column: span 3; padding: 12px; background: #444; border: 1px solid #666; }
+        .btn-vol { background: #2c3e50; }
+        .btn-mute { background: #c0392b; }
+        
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: #888; text-transform: uppercase; letter-spacing: 2px; }
+		
+		@media (max-width: 768px) {
+            .main-layout { flex-direction: column; height: auto; }
+            .tv-section { height: 250px; }
+            .remote-section { width: 100%; }
+        }
+		
+		/* 節目表容器 */
+        .epg-container {
+            width: 100%;
+            margin-top: 10px;
+            background: #222;
+            border-radius: 10px;
+            padding: 8px;
+            border: 1px solid #444;
+			min-height: 220px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .epg-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .epg-item {
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background: #333;
+            border-radius: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 4px solid transparent;
+			white-space: nowrap; 
+            overflow: hidden;   
+            text-overflow: ellipsis; 
+        }
+
+        .epg-item:hover { background: #444; border-left: 4px solid #0f0; }
+        .epg-item.active { background: #444; border-left: 4px solid #0f0; color: #0f0; }
+
+        .epg-pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .btn-page {
+                    padding: 5px 10px;
+            font-size: 12px;
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-layout">
+        <div class="tv-section">
+            <div id="player"></div>
+            <div id="osd">CH 1</div>
+            <div id="static" class="static-noise"></div>
+        </div>
+
+        <div class="remote-section">
+            <h2>TV Remote</h2>
+            <div id="digit-input"></div>
+            
+            <div class="button-grid">
+                <button onclick="pressNumber(1)">1</button>
+                <button onclick="pressNumber(2)">2</button>
+                <button onclick="pressNumber(3)">3</button>
+                <button onclick="pressNumber(4)">4</button>
+                <button onclick="pressNumber(5)">5</button>
+                <button onclick="pressNumber(6)">6</button>
+                <button onclick="pressNumber(7)">7</button>
+                <button onclick="pressNumber(8)">8</button>
+                <button onclick="pressNumber(9)">9</button>
+                
+                <div style="grid-column: 1;"></div>
+                <button onclick="pressNumber(0)">0</button>
+                <div style="grid-column: 3;"></div>
+                
+                <button class="btn-large" onclick="changeChannel(-1)">CH ▲ (上台)</button>
+                <button class="btn-large" onclick="changeChannel(1)">CH ▼ (下台)</button>
+                
+                <button class="btn-vol" onclick="adjustVolume(10)">VOL +</button>
+                <button class="btn-mute" onclick="toggleMute()">MUTE</button>
+                <button class="btn-vol" onclick="adjustVolume(-10)">VOL -</button>
+            </div>
+			
+			<div class="epg-container">
+                <div style="font-size: 12px; color: #888; margin-bottom: 5px;">節目表 (EPG)</div>
+                <ul id="epg-list" class="epg-list">
+                </ul>
+            <div class="epg-pagination">
+                <button class="btn-page" onclick="changePage(-1)">◀ 上一頁</button>
+                <span id="page-info" style="font-size: 12px;">1 / 1</span>
+                <button class="btn-page" onclick="changePage(1)">下一頁 ▶</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        const channels = [
+            { id: 'KyT4qSK8lJo', name: '台灣地震監視' }, 
+            { id: 'baDV1O5EBP0', name: '中視新聞' },
+            { id: 'VclhWKbvZCg', name: '你的鋼門比較鬆弛' },
+            { id: 'm_dhMSvUCIc', name: 'TVBS NEWS' },
+            { id: 'V1p33hqPrUk', name: '東森新聞' },
+            { id: 'Anr15FA9OCI', name: 'TBS NEWS DIG' },
+            { id: 'iZ44tIBbfH0', name: '邦邦電視台' },
+            { id: 'vr3XyVCR4T0', name: '三立新聞' },
+            { id: 'e1gbvCkwxFE', name: '我們這一家' },
+            { id: 'BjGEQyDPF0Y', name: '玉麟網路電視台' },
+			{ id: 'LzOTY4mZG00', name: '天氣資訊' },
+			{ id: 'rEKifG2XUZg', name: 'TOM and JERRY' },
+		    { id: 'H4X-DA9BMR0', name: '琅琊榜' },
+		    { id: '6IquAgfvYmc', name: '寰宇新聞' }
+        ];
+        
+        let currentIndex = 0;
+        let player;
+        let inputBuffer = "";
+        let inputTimer = null;
+		let currentPage = 0;
+		const pageSize = 4;
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                videoId: channels[currentIndex].id,
+                playerVars: { 
+                    'autoplay': 1, 
+                    'controls': 0, 
+                    'modestbranding': 1,
+                    'rel': 0,
+                    'mute': 1 // 為了自動播放，初始靜音
+                },
+                events: { 'onReady': onPlayerReady }
+            });
+        }
+		
+		// 渲染節目表：負責把頻道名稱畫在遙控器下方
+        function renderEPG() {
+            const listElement = document.getElementById('epg-list');
+            const pageInfo = document.getElementById('page-info');
+            if (!listElement) return; // 安全檢查
+
+            listElement.innerHTML = ""; // 先清空舊內容
+
+            // 計算分頁範圍
+            const start = currentPage * pageSize;
+            const end = Math.min(start + pageSize, channels.length);
+            const totalPages = Math.ceil(channels.length / pageSize) || 1;
+
+            for (let i = start; i < end; i++) {
+                const item = document.createElement('li');
+                // 如果是正在播放的頻道，加上 'active' 樣式
+                item.className = `epg-item ${i === currentIndex ? 'active' : ''}`;
+                item.innerText = `${i + 1}. ${channels[i].name}`;
+        
+                // 點擊節目表項目直接轉台
+                item.onclick = () => {
+                    currentIndex = i;
+                    updateTV();
+                };
+                listElement.appendChild(item);
+            }
+
+            // 更新頁碼文字 (例如: 1 / 2)
+            pageInfo.innerText = `${currentPage + 1} / ${totalPages}`;
+        }
+
+        // 翻頁函數
+        function changePage(direction) {
+            const totalPages = Math.ceil(channels.length / pageSize);
+            currentPage = (currentPage + direction + totalPages) % totalPages;
+            renderEPG();
+        }
+
+        function onPlayerReady(event) {
+            showOSD(`READY - CH ${currentIndex + 1}`);
+			renderEPG();
+        }
+
+        // 轉台邏輯
+        function changeChannel(direction) {
+            currentIndex = (currentIndex + direction + channels.length) % channels.length;
+            updateTV();
+        }
+
+        function pressNumber(num) {
+            const display = document.getElementById('digit-input');
+            inputBuffer += num;
+            display.innerText = inputBuffer;
+            clearTimeout(inputTimer);
+            inputTimer = setTimeout(() => {
+                let channelNum = parseInt(inputBuffer);
+                if (channelNum > 0 && channelNum <= channels.length) {
+                    currentIndex = channelNum - 1;
+                    updateTV();
+                } else {
+                    showOSD("ERR: 無此頻道");
+                }
+                inputBuffer = "";
+                display.innerText = "";
+            }, 1000);
+        }
+
+        function updateTV() {
+            const staticLayer = document.getElementById('static');
+            staticLayer.style.display = 'block';
+            
+            player.loadVideoById(channels[currentIndex].id);
+            player.unMute(); // 互動後解除靜音
+            showOSD(`CH ${currentIndex + 1}: ${channels[currentIndex].name}`);
+			
+			renderEPG();
+
+            setTimeout(() => {
+                staticLayer.style.display = 'none';
+            }, 500);
+        }
+
+        function adjustVolume(delta) {
+            player.unMute();
+            let vol = player.getVolume();
+            player.setVolume(vol + delta);
+            showOSD(`VOL: ${vol + delta}%`);
+        }
+
+        function toggleMute() {
+            if (player.isMuted()) {
+                player.unMute();
+                showOSD("UNMUTE");
+            } else {
+                player.mute();
+                showOSD("MUTE");
+            }
+        }
+
+        let osdTimer;
+        function showOSD(text) {
+            const osd = document.getElementById('osd');
+            osd.innerText = text;
+            osd.style.display = 'block';
+            clearTimeout(osdTimer);
+            osdTimer = setTimeout(() => { osd.style.display = 'none'; }, 3000);
+        }
+    </script>
+</body>
+</html>
